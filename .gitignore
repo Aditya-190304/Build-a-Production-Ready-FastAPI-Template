@@ -1,0 +1,16 @@
+.pytest_cache/
+pytest-cache-files-*/
+.ruff_cache/
+.venv/
+__pycache__/
+*.sqlite3
+*.db
+*.py[cod]
+*.egg-info/
+.coverage
+.env
+.mypy_cache/
+dist/
+build/
+.DS_Store
+Thumbs.db
