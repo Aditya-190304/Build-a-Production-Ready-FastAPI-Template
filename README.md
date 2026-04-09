@@ -31,23 +31,55 @@ A reusable, production-ready FastAPI boilerplate that gives teams a strong start
 |-- app
 |   |-- api
 |   |   |-- dependencies
-|   |   `-- v1
-|   |       `-- endpoints
+|   |   |   `-- auth.py
+|   |   |-- v1
+|   |   |   |-- endpoints
+|   |   |   |   |-- admin.py
+|   |   |   |   |-- auth.py
+|   |   |   |   |-- health.py
+|   |   |   |   `-- users.py
+|   |   |   `-- router.py
+|   |   |-- docs.py
+|   |   `-- router.py
 |   |-- core
 |   |   |-- exceptions
-|   |   `-- logging
+|   |   |   |-- auth.py
+|   |   |   |-- base.py
+|   |   |   `-- users.py
+|   |   |-- logging
+|   |   |   |-- config.py
+|   |   |   |-- formatters.py
+|   |   |   `-- middleware.py
+|   |   |-- config.py
+|   |   |-- constants.py
+|   |   |-- error_handlers.py
+|   |   `-- security.py
 |   |-- db
-|   |   `-- models
+|   |   |-- models
+|   |   |   `-- user.py
+|   |   |-- base.py
+|   |   `-- session.py
 |   |-- schemas
+|   |   |-- auth.py
+|   |   |-- error.py
+|   |   `-- user.py
 |   |-- scripts
+|   |   `-- seed_admin.py
 |   |-- services
+|   |   `-- users.py
 |   `-- main.py
 |-- tests
 |   |-- api
 |   |   `-- v1
-|   `-- logging
+|   |       `-- test_auth.py
+|   |-- logging
+|   |   `-- test_logging.py
+|   |-- conftest.py
+|   |-- constants.py
+|   `-- test_security_config.py
 |-- alembic
 |   `-- versions
+|       `-- 0001_create_users_table.py
 |-- .env.example
 |-- alembic.ini
 |-- pyproject.toml
