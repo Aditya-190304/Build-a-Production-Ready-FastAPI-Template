@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 
 from app.api.dependencies.auth import require_roles
+from app.api.docs import error_response_doc
 from app.db.models.user import User, UserRole
 from app.schemas.user import AdminSummaryResponse
 
@@ -19,6 +20,20 @@ AdminUserDependency = Annotated[User, Depends(RequireAdmin)]
         "Return an admin-only overview response to demonstrate "
         "role-based access control."
     ),
+    responses={
+        **error_response_doc(
+            status_code=401,
+            description="Authentication credentials are missing or invalid.",
+            code="unauthorized",
+            message="Authentication credentials were not provided.",
+        ),
+        **error_response_doc(
+            status_code=403,
+            description="Authenticated user does not have the required role.",
+            code="forbidden",
+            message="You do not have permission to access this resource.",
+        ),
+    },
 )
 async def read_admin_summary(current_user: AdminUserDependency) -> AdminSummaryResponse:
     return AdminSummaryResponse(

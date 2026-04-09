@@ -3,6 +3,7 @@ from app.core.constants import (
     DEFAULT_CORS_ALLOW_HEADERS,
     DEFAULT_CORS_ALLOW_METHODS,
     DEFAULT_CORS_ALLOW_ORIGINS,
+    DEFAULT_LOG_JSON,
     EXAMPLE_ADMIN_EMAIL,
     EXAMPLE_STRONG_PASSWORD,
     EXAMPLE_USER_EMAIL,
@@ -14,6 +15,7 @@ TEST_ENV = "test"
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 TEST_SECRET_KEY = "test-secret-key-with-at-least-32-bytes"
 TEST_ADMIN_PASSWORD = "AdminPass123!"
+TEST_LOG_LEVEL = "DEBUG"
 TEST_INVALID_PASSWORD = "WrongPassword123!"
 TEST_MEMBER_EMAIL = "rahul.verma@example.com"
 TEST_DUPLICATE_EMAIL = "kavya.nair@example.com"
@@ -25,6 +27,7 @@ TEST_UNKNOWN_EMAIL = "arjun.mehta@example.com"
 __all__ = [
     "APP_VERSION_DEFAULT",
     "DEFAULT_CORS_ALLOW_HEADERS",
+    "DEFAULT_LOG_JSON",
     "DEFAULT_CORS_ALLOW_METHODS",
     "DEFAULT_CORS_ALLOW_ORIGINS",
     "EXAMPLE_ADMIN_EMAIL",
@@ -38,6 +41,7 @@ __all__ = [
     "TEST_ENV",
     "TEST_INVALID_EMAIL",
     "TEST_INVALID_PASSWORD",
+    "TEST_LOG_LEVEL",
     "TEST_MEMBER_EMAIL",
     "TEST_SECRET_KEY",
     "TEST_SECURE_EMAIL",

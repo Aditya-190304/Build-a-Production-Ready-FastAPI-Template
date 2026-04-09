@@ -14,6 +14,9 @@ from app.core.constants import (
     DEFAULT_CORS_ALLOW_HEADERS,
     DEFAULT_CORS_ALLOW_METHODS,
     DEFAULT_CORS_ALLOW_ORIGINS,
+    DEFAULT_LOG_JSON,
+    DEFAULT_LOG_LEVEL,
+    LOCAL_LOG_LEVEL_DEFAULT,
 )
 
 
@@ -33,6 +36,8 @@ class Settings(BaseSettings):
         default=30,
         validation_alias="APP_ACCESS_TOKEN_EXPIRE_MINUTES",
     )
+    log_level: str | None = Field(default=None, validation_alias="APP_LOG_LEVEL")
+    log_json: bool = Field(default=DEFAULT_LOG_JSON, validation_alias="APP_LOG_JSON")
     cors_allow_origins: str = Field(
         default=DEFAULT_CORS_ALLOW_ORIGINS,
         validation_alias="APP_CORS_ALLOW_ORIGINS",
@@ -85,6 +90,14 @@ class Settings(BaseSettings):
     def cors_allow_headers_list(self) -> list[str]:
         return _split_csv(self.cors_allow_headers)
 
+    @property
+    def effective_log_level(self) -> str:
+        base_level = (
+            self.log_level
+            or (LOCAL_LOG_LEVEL_DEFAULT if self.app_env == "local" else DEFAULT_LOG_LEVEL)
+        )
+        return base_level.upper()
+
     @model_validator(mode="after")
     def validate_security_settings(self) -> "Settings":
         secret_value = self.secret_key.get_secret_value()
@@ -97,6 +110,11 @@ class Settings(BaseSettings):
         if self.cors_allow_credentials and "*" in self.cors_allow_origins_list:
             raise ValueError(
                 "APP_CORS_ALLOW_ORIGINS cannot contain '*' when credentials are enabled."
+            )
+
+        if self.effective_log_level not in {"CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"}:
+            raise ValueError(
+                "APP_LOG_LEVEL must be one of CRITICAL, ERROR, WARNING, INFO, or DEBUG."
             )
 
         if len(secret_value) < 32:

@@ -17,7 +17,10 @@ class HealthResponse(BaseModel):
     "/health",
     response_model=HealthResponse,
     summary="Health check",
-    description="Simple endpoint used for smoke checks and readiness probes.",
+    description=(
+        "Simple endpoint used for smoke checks and readiness probes. "
+        "Returns service metadata along with the current environment."
+    ),
 )
 def health_check() -> HealthResponse:
     settings = get_settings()
