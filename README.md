@@ -34,6 +34,8 @@ A reusable, production-ready FastAPI boilerplate that gives teams a strong start
 |   |   `-- v1
 |   |       `-- endpoints
 |   |-- core
+|   |   |-- exceptions
+|   |   `-- logging
 |   |-- db
 |   |   `-- models
 |   |-- schemas
@@ -41,8 +43,9 @@ A reusable, production-ready FastAPI boilerplate that gives teams a strong start
 |   |-- services
 |   `-- main.py
 |-- tests
-|   `-- api
-|       `-- v1
+|   |-- api
+|   |   `-- v1
+|   `-- logging
 |-- alembic
 |   `-- versions
 |-- .env.example
@@ -92,6 +95,27 @@ Open the following URLs after startup:
 - ReDoc: `http://127.0.0.1:8000/redoc`
 - Health check: `http://127.0.0.1:8000/api/v1/health`
 
+## Development workflow
+
+The template is designed for a straightforward local workflow:
+
+1. Install the project in editable mode with development dependencies.
+2. Keep a local `.env` file for environment-specific settings.
+3. Run Alembic migrations whenever the database schema changes.
+4. Start the API with auto-reload during development.
+5. Run `pytest` and `ruff check .` before pushing changes.
+
+Recommended day-to-day commands:
+
+```bash
+alembic upgrade head
+uvicorn app.main:app --reload
+pytest
+ruff check .
+```
+
+If you change models, schemas, or endpoint contracts, update the relevant tests and documentation in the same change.
+
 ## Database layer
 
 The template uses async SQLAlchemy sessions for application code and targets PostgreSQL via `asyncpg`. Tests use in-memory SQLite through `aiosqlite` so contributors can run the suite without provisioning a database server.
@@ -126,6 +150,26 @@ alembic downgrade -1
 ```
 
 The application does not create or mutate tables on startup. Run migrations explicitly before starting the API in local, staging, and production environments.
+
+Recommended schema-change workflow:
+
+1. Update the SQLAlchemy model in `app/db/models`.
+2. Generate a revision:
+
+```bash
+alembic revision --autogenerate -m "describe your change"
+```
+
+3. Review the generated migration file in `alembic/versions`.
+4. Apply the migration:
+
+```bash
+alembic upgrade head
+```
+
+5. Commit both the model changes and the Alembic revision together.
+
+Treat migration files as part of the source of truth for the database schema. If a model changes, there should usually be a matching migration in the same pull request.
 
 ## Admin bootstrap
 
@@ -343,6 +387,21 @@ The tests cover:
 - structured logging formatter output
 - async database session setup via reusable engine and test fixtures
 - coverage enforcement for the application package with a `70%` minimum threshold
+
+## Troubleshooting
+
+Common local development issues:
+
+- App fails at startup because `APP_DATABASE_URL` or `APP_SECRET_KEY` is missing:
+  Check that `.env` exists and includes the required variables.
+- `seed-admin` fails:
+  Make sure both `APP_DEFAULT_ADMIN_EMAIL` and `APP_DEFAULT_ADMIN_PASSWORD` are set together.
+- Database schema errors after model changes:
+  Generate and apply a new Alembic migration, then restart the app.
+- Request returns an error envelope unexpectedly:
+  Check the `request_id` in the response and the structured logs to trace the request.
+- Tests fail after changing contracts:
+  Update both the API tests and the request/response examples in the schemas and README.
 
 ## Run linting
 
