@@ -25,6 +25,7 @@ dev = [
   "aiosqlite>=0.20,<1.0",
   "httpx>=0.27,<1.0",
   "pytest>=8.3,<9.0",
+  "pytest-cov>=6.0,<7.0",
   "ruff>=0.7,<1.0",
 ]
 
@@ -35,8 +36,20 @@ seed-admin = "app.scripts.seed_admin:main"
 packages = ["app"]
 
 [tool.pytest.ini_options]
-addopts = "-q"
+addopts = "-q --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=70"
 testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
+omit = [
+  "app/__init__.py",
+  "app/scripts/*",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
 
 [tool.ruff]
 line-length = 100

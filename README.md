@@ -319,6 +319,14 @@ Use `seed-admin` if you want to create the default admin account from `APP_DEFAU
 pytest
 ```
 
+The template is configured with `pytest-cov`, so the default test run also measures coverage for the `app` package and enforces a minimum threshold of `70%`.
+
+If you want the full terminal report and XML output explicitly, run:
+
+```bash
+pytest --cov=app --cov-report=term-missing --cov-report=xml
+```
+
 The tests cover:
 
 - health endpoint availability
@@ -334,6 +342,7 @@ The tests cover:
 - environment-based security configuration validation
 - structured logging formatter output
 - async database session setup via reusable engine and test fixtures
+- coverage enforcement for the application package with a `70%` minimum threshold
 
 ## Run linting
 
