@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.core.config import get_settings
 
@@ -11,6 +11,17 @@ class HealthResponse(BaseModel):
     app_name: str
     environment: str
     version: str
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "ok",
+                "app_name": "FastAPI Template",
+                "environment": "local",
+                "version": "0.1.0",
+            }
+        }
+    )
 
 
 @router.get(
