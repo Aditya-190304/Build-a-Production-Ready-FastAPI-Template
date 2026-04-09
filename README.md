@@ -159,11 +159,32 @@ Password rules for account creation:
 
 The template now includes a consistent error and logging layer suitable for extension in real projects:
 
-- global exception handlers for validation errors, HTTP errors, and unexpected server errors
+- domain-specific exception classes with one global exception handler module
+- global exception handlers for validation errors, application errors, HTTP errors, and unexpected server errors
 - a standardized error response envelope across endpoints
 - per-request `X-Request-ID` headers for both success and error responses
 - structured request logs with JSON output by default
 - environment-aware log levels, with `DEBUG` as the default in `local` and `INFO` elsewhere unless overridden
+
+Current file layout for this layer:
+
+- `app/core/exceptions/base.py`: base application exception and reusable error detail object
+- `app/core/exceptions/auth.py`: authentication and authorization exceptions
+- `app/core/exceptions/users.py`: user-domain exceptions such as duplicate user conflicts
+- `app/core/error_handlers.py`: global exception handlers that translate exceptions into the shared API error format
+- `app/schemas/error.py`: shared error response schema used in API docs
+- `app/core/logging/config.py`: logging configuration entry point
+- `app/core/logging/formatters.py`: JSON log formatter
+- `app/core/logging/middleware.py`: request logging middleware
+
+The exception flow follows a clean layered pattern:
+
+1. Services and dependencies raise domain exceptions such as `UserAlreadyExistsError`, `InvalidCredentialsError`, or `AuthorizationError`.
+2. `app/core/error_handlers.py` catches them globally.
+3. The handler converts them into the shared error envelope and adds the request ID.
+4. Swagger/OpenAPI reuses the shared error schema so error responses are documented consistently.
+
+This keeps route handlers small and avoids repeating `HTTPException` response formatting across endpoints.
 
 Standard error response format:
 
@@ -205,6 +226,14 @@ Request logs include fields such as:
 - `status_code`
 - `duration_ms`
 - `client_ip`
+
+Logging flow:
+
+1. `configure_logging()` in `app/core/logging/config.py` sets the formatter and log level during app startup.
+2. `register_logging_middleware()` in `app/core/logging/middleware.py` assigns a request ID, measures request duration, and emits request logs.
+3. `JsonFormatter` in `app/core/logging/formatters.py` converts log records into structured JSON output.
+
+This makes it easy to switch or extend one part of the logging stack without rewriting the others.
 
 ## Environment variables
 
