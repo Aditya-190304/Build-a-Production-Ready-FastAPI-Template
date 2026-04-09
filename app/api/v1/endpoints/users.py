@@ -8,7 +8,7 @@ from app.db.models.user import User
 from app.db.session import get_db
 from app.schemas.auth import UserRegisterRequest
 from app.schemas.user import UserResponse
-from app.services.users import create_user, get_user_by_email
+from app.services.users import UserAlreadyExistsError, create_user, get_user_by_email
 
 router = APIRouter()
 CurrentUserDependency = Annotated[User, Depends(get_current_user)]
@@ -39,12 +39,18 @@ async def create_user_account(
             detail="A user with this email already exists.",
         )
 
-    user = await create_user(
-        db,
-        email=payload.email,
-        password=payload.password,
-        full_name=payload.full_name,
-    )
+    try:
+        user = await create_user(
+            db,
+            email=payload.email,
+            password=payload.password,
+            full_name=payload.full_name,
+        )
+    except UserAlreadyExistsError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A user with this email already exists.",
+        ) from exc
     return UserResponse.model_validate(user)
 
 
