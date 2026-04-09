@@ -3,7 +3,7 @@ from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import InvalidTokenError, decode_access_token
 from app.db.models.user import User, UserRole
@@ -15,10 +15,10 @@ bearer_scheme = HTTPBearer(
     description="Paste the JWT access token returned by the login endpoint.",
 )
 CredentialsDependency = Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)]
-DatabaseDependency = Annotated[Session, Depends(get_db)]
+DatabaseDependency = Annotated[AsyncSession, Depends(get_db)]
 
 
-def get_current_user(
+async def get_current_user(
     credentials: CredentialsDependency,
     db: DatabaseDependency,
 ) -> User:
@@ -43,7 +43,7 @@ def get_current_user(
             detail="Invalid token payload.",
         )
 
-    user = get_user_by_email(db, email)
+    user = await get_user_by_email(db, email)
     if user is None or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -56,7 +56,7 @@ def get_current_user(
 def require_roles(*allowed_roles: UserRole) -> Callable[[User], User]:
     current_user_dependency = Depends(get_current_user)
 
-    def dependency(current_user: Annotated[User, current_user_dependency]) -> User:
+    async def dependency(current_user: Annotated[User, current_user_dependency]) -> User:
         if current_user.role not in allowed_roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

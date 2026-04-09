@@ -12,15 +12,15 @@ AdminUserDependency = Annotated[User, Depends(RequireAdmin)]
 
 
 @router.get(
-    "/summary",
+    "/overview",
     response_model=AdminSummaryResponse,
-    summary="Admin-only example route",
+    summary="Get the admin overview",
     description=(
-        "Demonstrates role-based access control by restricting this route "
-        "to administrators."
+        "Return an admin-only overview response to demonstrate "
+        "role-based access control."
     ),
 )
-def read_admin_summary(current_user: AdminUserDependency) -> AdminSummaryResponse:
+async def read_admin_summary(current_user: AdminUserDependency) -> AdminSummaryResponse:
     return AdminSummaryResponse(
         message="Admin access granted.",
         current_user_email=current_user.email,

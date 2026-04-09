@@ -1,6 +1,6 @@
 # FastAPI Template
 
-A reusable, production-minded FastAPI boilerplate that gives teams a clean starting point for API projects. This version includes JWT authentication, role-based access control, SQLite-backed persistence, versioned routing, strong request validation, and a practical test suite that other developers can extend safely.
+A reusable, production-ready FastAPI boilerplate that gives teams a strong starting point for future API projects. The template includes JWT authentication, async SQLAlchemy, PostgreSQL-ready configuration, Alembic migrations, clear API docs, and tests that are easy for other developers to extend.
 
 ## Features
 
@@ -8,7 +8,10 @@ A reusable, production-minded FastAPI boilerplate that gives teams a clean start
 - JWT authentication with secure password hashing using Argon2 via `pwdlib`
 - User registration and login with bearer token protection
 - Role-based access control with `user` and `admin` examples
-- SQLAlchemy-based persistence with SQLite as the default local database
+- Async SQLAlchemy with PostgreSQL-ready configuration
+- Reusable timestamp mixin for `created_at` and `updated_at`
+- User model with `id`, `email`, `password_hash`, `full_name`, role, and activity status
+- Connection pooling controls for async PostgreSQL deployments
 - Alembic migrations for controlled schema evolution
 - Versioned API routing under `/api/v1`
 - Health endpoint for smoke checks and readiness probes
@@ -47,14 +50,16 @@ A reusable, production-minded FastAPI boilerplate that gives teams a clean start
 1. Create a virtual environment.
 2. Install dependencies.
 3. Copy `.env.example` to `.env`.
-4. Update secrets and admin credentials for your environment.
-5. Run the app.
+4. Create a PostgreSQL database and update `.env` if needed.
+5. Apply database migrations.
+6. Run the app.
 
 ```bash
 python -m venv .venv
 .venv\Scripts\activate
 pip install -e ".[dev]"
 copy .env.example .env
+alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
@@ -64,6 +69,17 @@ Open the following URLs after startup:
 - Swagger UI: `http://127.0.0.1:8000/docs`
 - ReDoc: `http://127.0.0.1:8000/redoc`
 - Health check: `http://127.0.0.1:8000/api/v1/health`
+
+## Database layer
+
+The template uses async SQLAlchemy sessions for application code and targets PostgreSQL via `asyncpg`. Tests use in-memory SQLite through `aiosqlite` so contributors can run the suite without provisioning a database server.
+
+Key pieces:
+
+- `app/db/session.py`: async engine, connection pooling, and session management
+- `app/db/base.py`: declarative base plus reusable timestamp mixin
+- `app/db/models/user.py`: async-compatible ORM user model
+- `alembic/`: schema migration history
 
 ## Database migrations
 
@@ -87,7 +103,7 @@ Roll back one migration:
 alembic downgrade -1
 ```
 
-For local development, the app still creates missing tables at startup to keep the template easy to run. Alembic should be the source of truth for evolving schemas across environments.
+For local development, the app still creates missing tables at startup to keep the template easy to run. Alembic should still be treated as the source of truth for schema changes across environments.
 
 ## Environment variables
 
@@ -100,10 +116,14 @@ All application settings are namespaced with `APP_` to avoid collisions with mac
 | `APP_DEBUG` | FastAPI debug mode | `false` |
 | `APP_API_V1_PREFIX` | Prefix for version 1 routes | `/api/v1` |
 | `APP_VERSION` | API version shown in docs | `0.1.0` |
-| `APP_DATABASE_URL` | SQLAlchemy database URL | `sqlite:///./fastapi_template.db` |
+| `APP_DATABASE_URL` | Async SQLAlchemy database URL | `postgresql+asyncpg://postgres:postgres@localhost:5432/fastapi_template` |
+| `APP_DB_POOL_SIZE` | Base PostgreSQL connection pool size | `10` |
+| `APP_DB_MAX_OVERFLOW` | Extra pooled connections allowed above the base pool | `20` |
+| `APP_DB_POOL_TIMEOUT` | Seconds to wait for a pooled connection | `30` |
+| `APP_DB_POOL_RECYCLE` | Seconds before recycling a pooled PostgreSQL connection | `1800` |
 | `APP_SECRET_KEY` | JWT signing secret | `change-me-with-a-long-random-secret` |
 | `APP_ACCESS_TOKEN_EXPIRE_MINUTES` | Access token lifetime in minutes | `30` |
-| `APP_DEFAULT_ADMIN_EMAIL` | Seeded admin account email | `admin@example.com` |
+| `APP_DEFAULT_ADMIN_EMAIL` | Seeded admin account email | `aditi.admin@example.com` |
 | `APP_DEFAULT_ADMIN_PASSWORD` | Seeded admin account password | `ChangeMe123!` |
 
 Change `APP_SECRET_KEY` and the default admin credentials before any non-local deployment.
@@ -112,22 +132,23 @@ Change `APP_SECRET_KEY` and the default admin credentials before any non-local d
 
 ### Register
 
-`POST /api/v1/auth/register`
+`POST /api/v1/users`
 
 ```json
 {
-  "email": "developer@example.com",
+  "full_name": "Priya Sharma",
+  "email": "priya.sharma@example.com",
   "password": "StrongPassword123!"
 }
 ```
 
 ### Login
 
-`POST /api/v1/auth/login`
+`POST /api/v1/auth/tokens`
 
 ```json
 {
-  "email": "developer@example.com",
+  "email": "priya.sharma@example.com",
   "password": "StrongPassword123!"
 }
 ```
@@ -149,8 +170,8 @@ Authorization: Bearer <access_token>
 
 ## Protected routes
 
-- `GET /api/v1/users/me`: any authenticated user
-- `GET /api/v1/admin/summary`: admin role only
+- `GET /api/v1/users/current`: any authenticated user
+- `GET /api/v1/admin/overview`: admin role only
 
 The template seeds a default admin account on startup using `APP_DEFAULT_ADMIN_EMAIL` and `APP_DEFAULT_ADMIN_PASSWORD`.
 
@@ -168,6 +189,7 @@ The tests cover:
 - protected route access
 - role-based access control
 - invalid credential handling
+- async database session setup via app startup and test fixtures
 
 ## Run linting
 
@@ -183,8 +205,9 @@ ruff format .
 - Add new database models in `app/db/models`
 - Add new route groups in `app/api/v1/endpoints`
 - Reuse shared auth dependencies from `app/api/dependencies`
-- Replace SQLite with PostgreSQL by changing `APP_DATABASE_URL`
+- Keep async application code on `AsyncSession` dependencies
 - Add new Alembic revisions in `alembic/versions` when the schema changes
+- Update request and response examples whenever endpoint contracts change
 
 ## Suggested next improvements
 

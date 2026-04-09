@@ -10,9 +10,9 @@ from app.services.users import seed_default_admin
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    init_db()
-    with get_session_factory()() as session:
-        seed_default_admin(session)
+    await init_db()
+    async with get_session_factory()() as session:
+        await seed_default_admin(session)
     yield
 
 

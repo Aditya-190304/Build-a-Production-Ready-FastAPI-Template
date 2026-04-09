@@ -1,9 +1,12 @@
-from collections.abc import Generator
+from collections.abc import AsyncGenerator
 from functools import lru_cache
 
-from sqlalchemy import create_engine
-from sqlalchemy.engine import Engine
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.pool import StaticPool
 
 from app.core.config import get_settings
@@ -18,38 +21,48 @@ def _build_connect_args(database_url: str) -> dict[str, bool]:
 
 
 def _build_engine_kwargs(database_url: str) -> dict[str, object]:
-    engine_kwargs: dict[str, object] = {
-        "future": True,
-        "connect_args": _build_connect_args(database_url),
-    }
-    if database_url in {"sqlite://", "sqlite:///:memory:"}:
+    settings = get_settings()
+    engine_kwargs: dict[str, object] = {"connect_args": _build_connect_args(database_url)}
+    if database_url in {
+        "sqlite://",
+        "sqlite:///:memory:",
+        "sqlite+aiosqlite://",
+        "sqlite+aiosqlite:///:memory:",
+    }:
         engine_kwargs["poolclass"] = StaticPool
+    elif database_url.startswith("postgresql"):
+        engine_kwargs.update(
+            {
+                "pool_pre_ping": True,
+                "pool_size": settings.db_pool_size,
+                "max_overflow": settings.db_max_overflow,
+                "pool_timeout": settings.db_pool_timeout,
+                "pool_recycle": settings.db_pool_recycle,
+            }
+        )
     return engine_kwargs
 
 
 @lru_cache
-def get_engine() -> Engine:
+def get_engine() -> AsyncEngine:
     settings = get_settings()
-    return create_engine(settings.database_url, **_build_engine_kwargs(settings.database_url))
+    return create_async_engine(settings.database_url, **_build_engine_kwargs(settings.database_url))
 
 
 @lru_cache
-def get_session_factory() -> sessionmaker[Session]:
-    return sessionmaker(
+def get_session_factory() -> async_sessionmaker[AsyncSession]:
+    return async_sessionmaker(
         bind=get_engine(),
-        autocommit=False,
         autoflush=False,
         expire_on_commit=False,
     )
 
 
-def get_db() -> Generator[Session, None, None]:
-    session = get_session_factory()()
-    try:
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    async with get_session_factory()() as session:
         yield session
-    finally:
-        session.close()
 
 
-def init_db() -> None:
-    Base.metadata.create_all(bind=get_engine())
+async def init_db() -> None:
+    async with get_engine().begin() as connection:
+        await connection.run_sync(Base.metadata.create_all)

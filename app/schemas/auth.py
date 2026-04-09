@@ -2,10 +2,17 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserRegisterRequest(BaseModel):
+    full_name: str = Field(
+        ...,
+        min_length=1,
+        max_length=255,
+        description="Display name for the user account.",
+        examples=["Priya Sharma"],
+    )
     email: EmailStr = Field(
         ...,
         description="Unique email address used to sign in.",
-        examples=["developer@example.com"],
+        examples=["priya.sharma@example.com"],
     )
     password: str = Field(
         ...,
@@ -18,7 +25,8 @@ class UserRegisterRequest(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "email": "developer@example.com",
+                "full_name": "Priya Sharma",
+                "email": "priya.sharma@example.com",
                 "password": "StrongPassword123!",
             }
         }
@@ -29,7 +37,7 @@ class UserLoginRequest(BaseModel):
     email: EmailStr = Field(
         ...,
         description="Registered email address.",
-        examples=["developer@example.com"],
+        examples=["priya.sharma@example.com"],
     )
     password: str = Field(
         ...,
@@ -42,7 +50,7 @@ class UserLoginRequest(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "email": "developer@example.com",
+                "email": "priya.sharma@example.com",
                 "password": "StrongPassword123!",
             }
         }
@@ -64,4 +72,3 @@ class TokenResponse(BaseModel):
             }
         }
     )
-
