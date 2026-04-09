@@ -1,19 +1,20 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import get_settings
-from app.db.session import get_session_factory, init_db
-from app.services.users import seed_default_admin
+from app.db.session import get_engine
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    await init_db()
-    async with get_session_factory()() as session:
-        await seed_default_admin(session)
-    yield
+    try:
+        yield
+    finally:
+        if get_engine.cache_info().currsize:
+            await get_engine().dispose()
 
 
 def create_app() -> FastAPI:
@@ -28,6 +29,13 @@ def create_app() -> FastAPI:
             "Reusable FastAPI template with JWT authentication, role-based access control, "
             "centralized settings, and a test-friendly application structure."
         ),
+    )
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_allow_origins_list,
+        allow_credentials=settings.cors_allow_credentials,
+        allow_methods=settings.cors_allow_methods_list,
+        allow_headers=settings.cors_allow_headers_list,
     )
     application.include_router(api_router, prefix=settings.api_v1_prefix)
     return application

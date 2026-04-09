@@ -5,9 +5,9 @@ from jwt import InvalidTokenError
 from pwdlib import PasswordHash
 
 from app.core.config import get_settings
+from app.core.constants import JWT_ALGORITHM
 from app.db.models.user import UserRole
 
-ALGORITHM = "HS256"
 password_hash = PasswordHash.recommended()
 
 
@@ -28,12 +28,12 @@ def create_access_token(*, subject: str, role: UserRole, expires_minutes: int | 
         "role": role.value,
         "exp": expires_at,
     }
-    return jwt.encode(payload, settings.secret_key.get_secret_value(), algorithm=ALGORITHM)
+    return jwt.encode(payload, settings.secret_key.get_secret_value(), algorithm=JWT_ALGORITHM)
 
 
 def decode_access_token(token: str) -> dict[str, str]:
     settings = get_settings()
-    payload = jwt.decode(token, settings.secret_key.get_secret_value(), algorithms=[ALGORITHM])
+    payload = jwt.decode(token, settings.secret_key.get_secret_value(), algorithms=[JWT_ALGORITHM])
     return payload
 
 
