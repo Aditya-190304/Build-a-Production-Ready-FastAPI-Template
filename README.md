@@ -255,20 +255,46 @@ ruff format .
 
 ## How to extend this template
 
-- Add new business logic in `app/services`
-- Add request and response contracts in `app/schemas`
-- Add new database models in `app/db/models`
-- Add new route groups in `app/api/v1/endpoints`
-- Reuse shared auth dependencies from `app/api/dependencies`
-- Keep async application code on `AsyncSession` dependencies
-- Add new Alembic revisions in `alembic/versions` when the schema changes
-- Prefer environment variables for security-sensitive configuration
-- Update request and response examples whenever endpoint contracts change
+When you add a new feature, try to keep the same layering used by the existing auth flow:
 
-## Suggested next improvements
+1. Define or update the database model in `app/db/models` if the feature needs persistent data.
+2. Create or update request and response schemas in `app/schemas` so validation and OpenAPI docs stay accurate.
+3. Implement business logic in `app/services` instead of putting database or domain logic directly in route handlers.
+4. Add the HTTP endpoints in `app/api/v1/endpoints` and keep them focused on request parsing, dependency injection, and response shaping.
+5. Register the new router in `app/api/v1/router.py` so the endpoints are exposed under `/api/v1`.
+6. Add or update tests in `tests/` for success cases, validation failures, auth behavior, and permission checks.
+7. Create a new Alembic migration whenever the schema changes.
 
-- refresh token support
-- account verification and password reset flows
-- structured logging and request correlation IDs
-- CORS and trusted host middleware
-- Docker and CI pipeline setup
+Use each folder for one clear responsibility:
+
+- `app/db/models`: SQLAlchemy ORM models that represent database tables.
+- `app/schemas`: Pydantic models for request validation, response serialization, and Swagger examples.
+- `app/services`: reusable business logic, data access coordination, and feature workflows.
+- `app/api/v1/endpoints`: route handlers for each resource or feature area.
+- `app/api/dependencies`: shared dependencies such as authentication, current-user lookup, and role checks.
+
+Recommended workflow for adding a new feature:
+
+1. Start with the schema and data model.
+2. Add the service-layer functions.
+3. Expose the feature through an endpoint.
+4. Add tests.
+5. Update the docs and examples.
+
+A practical example:
+
+- If you want to add a `projects` feature, create `app/db/models/project.py` for the table definition.
+- Add `app/schemas/project.py` for request and response contracts.
+- Add `app/services/projects.py` for create/list/update business logic.
+- Add `app/api/v1/endpoints/projects.py` for the API routes.
+- Include the router in `app/api/v1/router.py`.
+- Add tests such as `tests/api/v1/test_projects.py`.
+- Generate a migration with `alembic revision --autogenerate -m "add projects table"` and apply it with `alembic upgrade head`.
+
+A few rules help keep the template maintainable:
+
+- Reuse shared auth dependencies from `app/api/dependencies` instead of re-implementing token parsing or role checks in each endpoint.
+- Keep application code async and continue using `AsyncSession` dependencies for database access.
+- Prefer environment variables for security-sensitive configuration such as database URLs, JWT secrets, and admin bootstrap credentials.
+- Keep sample request and response examples updated whenever endpoint contracts change so the Swagger documentation remains helpful.
+- Avoid putting business logic directly in route handlers; if an endpoint starts doing too much, move that logic into a service.
