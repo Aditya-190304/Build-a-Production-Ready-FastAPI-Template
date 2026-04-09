@@ -40,6 +40,7 @@ def test_health_check_returns_expected_payload(client: TestClient) -> None:
     response = client.get("/api/v1/health")
 
     assert response.status_code == 200
+    assert "X-Request-ID" in response.headers
     assert response.json() == {
         "status": "ok",
         "app_name": TEST_APP_NAME,
@@ -76,7 +77,10 @@ def test_duplicate_registration_is_rejected(client: TestClient) -> None:
     )
 
     assert response.status_code == 409
-    assert response.json()["detail"] == "A user with this email already exists."
+    payload = response.json()
+    assert payload["error"]["code"] == "conflict"
+    assert payload["error"]["message"] == "A user with this email already exists."
+    assert payload["error"]["request_id"]
 
 
 def test_registration_rejects_weak_password(client: TestClient) -> None:
@@ -90,7 +94,10 @@ def test_registration_rejects_weak_password(client: TestClient) -> None:
     )
 
     assert response.status_code == 422
-    assert "uppercase letter" in response.text
+    payload = response.json()
+    assert payload["error"]["code"] == "validation_error"
+    assert payload["error"]["details"]
+    assert "uppercase letter" in payload["error"]["details"][0]["message"]
 
 
 def test_registration_rejects_invalid_email_format(client: TestClient) -> None:
@@ -104,7 +111,9 @@ def test_registration_rejects_invalid_email_format(client: TestClient) -> None:
     )
 
     assert response.status_code == 422
-    assert "email" in response.text.lower()
+    payload = response.json()
+    assert payload["error"]["code"] == "validation_error"
+    assert any("email" in detail["field"] for detail in payload["error"]["details"])
 
 
 def test_cors_preflight_returns_expected_headers(client: TestClient) -> None:
@@ -133,6 +142,7 @@ def test_admin_route_requires_admin_role(client: TestClient) -> None:
     )
 
     assert denied_response.status_code == 403
+    assert denied_response.json()["error"]["code"] == "forbidden"
 
     admin_token = _login_user(client, EXAMPLE_ADMIN_EMAIL, TEST_ADMIN_PASSWORD)
     allowed_response = client.get(
@@ -151,4 +161,15 @@ def test_login_rejects_invalid_credentials(client: TestClient) -> None:
     )
 
     assert response.status_code == 401
-    assert response.json()["detail"] == "Invalid email or password."
+    assert response.json()["error"]["code"] == "unauthorized"
+    assert response.json()["error"]["message"] == "Invalid email or password."
+
+
+def test_missing_route_uses_standardized_error_format(client: TestClient) -> None:
+    response = client.get("/api/v1/does-not-exist")
+
+    assert response.status_code == 404
+    payload = response.json()
+    assert payload["error"]["code"] == "not_found"
+    assert payload["error"]["message"] == "Not Found"
+    assert payload["error"]["request_id"]

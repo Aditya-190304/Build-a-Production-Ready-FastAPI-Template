@@ -14,6 +14,9 @@ A reusable, production-ready FastAPI boilerplate that gives teams a strong start
 - User model with `id`, `email`, `password_hash`, `full_name`, role, and activity status
 - Connection pooling controls for async PostgreSQL deployments
 - Environment-based security settings and configurable CORS middleware
+- Global exception handlers with a standardized error response format
+- Structured request logging with JSON output and request IDs
+- Environment-aware log levels for local and non-local deployments
 - Alembic migrations for controlled schema evolution
 - Versioned API routing under `/api/v1`
 - Health endpoint for smoke checks and readiness probes
@@ -142,7 +145,7 @@ The template includes a few baseline production-minded security practices out of
 - password strength validation during account creation
 - JWT-based authentication and role checks
 - CORS configured through environment variables
-- environment-based secret validation so placeholder secrets are rejected outside local and test environments
+- environment-based secrets and admin bootstrap credentials instead of runtime hardcoded values
 
 Password rules for account creation:
 
@@ -151,6 +154,86 @@ Password rules for account creation:
 - at least one lowercase letter
 - at least one number
 - at least one special character
+
+## Error handling and logging
+
+The template now includes a consistent error and logging layer suitable for extension in real projects:
+
+- domain-specific exception classes with one global exception handler module
+- global exception handlers for validation errors, application errors, HTTP errors, and unexpected server errors
+- a standardized error response envelope across endpoints
+- per-request `X-Request-ID` headers for both success and error responses
+- structured request logs with JSON output by default
+- environment-aware log levels, with `DEBUG` as the default in `local` and `INFO` elsewhere unless overridden
+
+Current file layout for this layer:
+
+- `app/core/exceptions/base.py`: base application exception and reusable error detail object
+- `app/core/exceptions/auth.py`: authentication and authorization exceptions
+- `app/core/exceptions/users.py`: user-domain exceptions such as duplicate user conflicts
+- `app/core/error_handlers.py`: global exception handlers that translate exceptions into the shared API error format
+- `app/schemas/error.py`: shared error response schema used in API docs
+- `app/core/logging/config.py`: logging configuration entry point
+- `app/core/logging/formatters.py`: JSON log formatter
+- `app/core/logging/middleware.py`: request logging middleware
+
+The exception flow follows a clean layered pattern:
+
+1. Services and dependencies raise domain exceptions such as `UserAlreadyExistsError`, `InvalidCredentialsError`, or `AuthorizationError`.
+2. `app/core/error_handlers.py` catches them globally.
+3. The handler converts them into the shared error envelope and adds the request ID.
+4. Swagger/OpenAPI reuses the shared error schema so error responses are documented consistently.
+
+This keeps route handlers small and avoids repeating `HTTPException` response formatting across endpoints.
+
+Standard error response format:
+
+```json
+{
+  "error": {
+    "code": "validation_error",
+    "message": "Request validation failed.",
+    "request_id": "2ee56d4b-859b-426d-9f0b-23ec6cc8db4b",
+    "details": [
+      {
+        "field": "body.email",
+        "message": "value is not a valid email address",
+        "type": "value_error"
+      }
+    ]
+  }
+}
+```
+
+Typical error codes returned by the template include:
+
+- `validation_error`
+- `unauthorized`
+- `forbidden`
+- `not_found`
+- `conflict`
+- `internal_server_error`
+
+Request logs include fields such as:
+
+- `timestamp`
+- `level`
+- `logger`
+- `message`
+- `request_id`
+- `method`
+- `path`
+- `status_code`
+- `duration_ms`
+- `client_ip`
+
+Logging flow:
+
+1. `configure_logging()` in `app/core/logging/config.py` sets the formatter and log level during app startup.
+2. `register_logging_middleware()` in `app/core/logging/middleware.py` assigns a request ID, measures request duration, and emits request logs.
+3. `JsonFormatter` in `app/core/logging/formatters.py` converts log records into structured JSON output.
+
+This makes it easy to switch or extend one part of the logging stack without rewriting the others.
 
 ## Environment variables
 
@@ -163,21 +246,23 @@ All application settings are namespaced with `APP_` to avoid collisions with mac
 | `APP_DEBUG` | FastAPI debug mode | `false` |
 | `APP_API_V1_PREFIX` | Prefix for version 1 routes | `/api/v1` |
 | `APP_VERSION` | API version shown in docs | `0.1.0` |
-| `APP_DATABASE_URL` | Async SQLAlchemy database URL | `postgresql+asyncpg://postgres:postgres@localhost:5432/fastapi_template` |
+| `APP_DATABASE_URL` | Async SQLAlchemy database URL | Required |
 | `APP_DB_POOL_SIZE` | Base PostgreSQL connection pool size | `10` |
 | `APP_DB_MAX_OVERFLOW` | Extra pooled connections allowed above the base pool | `20` |
 | `APP_DB_POOL_TIMEOUT` | Seconds to wait for a pooled connection | `30` |
 | `APP_DB_POOL_RECYCLE` | Seconds before recycling a pooled PostgreSQL connection | `1800` |
-| `APP_SECRET_KEY` | JWT signing secret | `change-me-with-a-long-random-secret` |
+| `APP_SECRET_KEY` | JWT signing secret | Required, minimum 32 characters |
 | `APP_ACCESS_TOKEN_EXPIRE_MINUTES` | Access token lifetime in minutes | `30` |
+| `APP_LOG_LEVEL` | Optional override for the application log level | `DEBUG` in `local`, `INFO` otherwise |
+| `APP_LOG_JSON` | Whether logs should be emitted as structured JSON | `true` |
 | `APP_CORS_ALLOW_ORIGINS` | Comma-separated allowed origins for browser clients | `http://localhost:3000,http://127.0.0.1:3000` |
 | `APP_CORS_ALLOW_CREDENTIALS` | Whether browsers may send credentials on cross-origin requests | `true` |
 | `APP_CORS_ALLOW_METHODS` | Comma-separated HTTP methods exposed by CORS | `GET,POST,PUT,PATCH,DELETE,OPTIONS` |
 | `APP_CORS_ALLOW_HEADERS` | Comma-separated allowed request headers for CORS | `Authorization,Content-Type` |
-| `APP_DEFAULT_ADMIN_EMAIL` | Seeded admin account email | `aditi.admin@example.com` |
-| `APP_DEFAULT_ADMIN_PASSWORD` | Seeded admin account password | `ChangeMe123!` |
+| `APP_DEFAULT_ADMIN_EMAIL` | Optional seeded admin account email, used by `seed-admin` | Not set |
+| `APP_DEFAULT_ADMIN_PASSWORD` | Optional seeded admin password, used by `seed-admin` | Not set |
 
-Change `APP_SECRET_KEY` and the default admin credentials before any non-local deployment. The app rejects the placeholder secret key and admin password outside `local` and `test` environments.
+`APP_DATABASE_URL` and `APP_SECRET_KEY` must be supplied through the environment or `.env`. If you want to use `seed-admin`, provide both `APP_DEFAULT_ADMIN_EMAIL` and `APP_DEFAULT_ADMIN_PASSWORD` together.
 
 ## Authentication flow
 
@@ -219,6 +304,8 @@ Use it in protected requests:
 Authorization: Bearer <access_token>
 ```
 
+Validation and auth failures also appear in the Swagger docs with the shared error schema and examples.
+
 ## Protected routes
 
 - `GET /api/v1/users/current`: any authenticated user
@@ -237,6 +324,7 @@ The tests cover:
 - health endpoint availability
 - user registration
 - successful login
+- standardized error response formatting
 - password strength validation
 - email format validation
 - CORS preflight behavior
@@ -244,6 +332,7 @@ The tests cover:
 - role-based access control
 - invalid credential handling
 - environment-based security configuration validation
+- structured logging formatter output
 - async database session setup via reusable engine and test fixtures
 
 ## Run linting

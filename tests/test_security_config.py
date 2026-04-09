@@ -13,6 +13,8 @@ def _clear_sensitive_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "APP_DEFAULT_ADMIN_PASSWORD",
         "APP_CORS_ALLOW_ORIGINS",
         "APP_CORS_ALLOW_CREDENTIALS",
+        "APP_LOG_LEVEL",
+        "APP_LOG_JSON",
     ):
         monkeypatch.delenv(key, raising=False)
 
@@ -76,3 +78,42 @@ def test_admin_seed_settings_must_be_provided_together(
         assert "must be provided together" in str(exc)
     else:
         raise AssertionError("Expected incomplete admin seed settings to fail validation.")
+
+
+def test_log_level_defaults_to_debug_for_local(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_sensitive_env(monkeypatch)
+    settings = Settings(
+        _env_file=None,
+        APP_ENV="local",
+        APP_DATABASE_URL="sqlite+aiosqlite:///:memory:",
+        APP_SECRET_KEY=TEST_SECRET_KEY,
+    )
+
+    assert settings.effective_log_level == "DEBUG"
+
+
+def test_log_level_defaults_to_info_for_production(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_sensitive_env(monkeypatch)
+    settings = Settings(
+        _env_file=None,
+        APP_ENV="production",
+        APP_DATABASE_URL="sqlite+aiosqlite:///:memory:",
+        APP_SECRET_KEY=TEST_SECRET_KEY,
+    )
+
+    assert settings.effective_log_level == "INFO"
+
+
+def test_invalid_log_level_is_rejected(monkeypatch: pytest.MonkeyPatch) -> None:
+    _clear_sensitive_env(monkeypatch)
+    try:
+        Settings(
+            _env_file=None,
+            APP_DATABASE_URL="sqlite+aiosqlite:///:memory:",
+            APP_SECRET_KEY=TEST_SECRET_KEY,
+            APP_LOG_LEVEL="VERBOSE",
+        )
+    except ValidationError as exc:
+        assert "APP_LOG_LEVEL must be one of" in str(exc)
+    else:
+        raise AssertionError("Expected invalid APP_LOG_LEVEL to fail validation.")

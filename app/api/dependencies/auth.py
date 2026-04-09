@@ -1,11 +1,18 @@
 from collections.abc import Callable
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import InvalidTokenError, decode_access_token
+from app.core.exceptions import (
+    AuthenticationRequiredError,
+    AuthorizationError,
+    InvalidTokenError,
+    UserUnavailableError,
+)
+from app.core.security import InvalidTokenError as JwtInvalidTokenError
+from app.core.security import decode_access_token
 from app.db.models.user import User, UserRole
 from app.db.session import get_db
 from app.services.users import get_user_by_email
@@ -23,32 +30,20 @@ async def get_current_user(
     db: DatabaseDependency,
 ) -> User:
     if credentials is None or credentials.scheme.lower() != "bearer":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication credentials were not provided.",
-        )
+        raise AuthenticationRequiredError()
 
     try:
         payload = decode_access_token(credentials.credentials)
-    except InvalidTokenError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token.",
-        ) from exc
+    except JwtInvalidTokenError as exc:
+        raise InvalidTokenError() from exc
 
     email = payload.get("sub")
     if not isinstance(email, str):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token payload.",
-        )
+        raise InvalidTokenError(message="Invalid token payload.")
 
     user = await get_user_by_email(db, email)
     if user is None or not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User account is unavailable.",
-        )
+        raise UserUnavailableError()
 
     return user
 
@@ -58,10 +53,7 @@ def require_roles(*allowed_roles: UserRole) -> Callable[[User], User]:
 
     async def dependency(current_user: Annotated[User, current_user_dependency]) -> User:
         if current_user.role not in allowed_roles:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You do not have permission to access this resource.",
-            )
+            raise AuthorizationError()
         return current_user
 
     return dependency
